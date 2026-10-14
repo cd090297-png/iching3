@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>易經開卦系統</title>
+  
+  <!-- 引入開源的曆法套件：自動精算當日節氣與地支月令 -->
+  <script src="https://cdn.jsdelivr.net/npm/lunar-javascript/lunar.js"></script>
+  <!-- 引入 html2canvas 套件：用於將 HTML 轉換為圖片 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, 'Microsoft JhengHei', sans-serif;
+      background-color: #f4f6f8;
+      color: #333;
+      padding: 10px;
+      margin: 0;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 20px 15px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+      box-sizing: border-box;
+    }
+    h2 { text-align: center; color: #2c3e50; margin-top: 0; font-size: 22px; }
+    .form-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 25px; }
+    .input-group { flex: 1; min-width: 110px; display: flex; flex-direction: column; }
+    
+    /* 讓問題輸入框獨佔一行 */
+    .full-width { flex: 1 1 100%; }
+    
+    label { font-size: 16px; margin-bottom: 8px; color: #555; font-weight: bold; }
+    
+    input[type="number"], input[type="text"], select {
+      width: 100%; box-sizing: border-box; padding: 12px;
+      border: 1px solid #c0c6cc; border-radius: 8px; font-size: 18px;
+      text-align: center; background-color: #fafbfc;
+    }
+    
+    button {
+      width: 100%; padding: 15px; background-color: #4a6fa5; color: white;
+      border: none; border-radius: 8px; font-size: 18px; cursor: pointer;
+      font-weight: bold; transition: background-color 0.3s;
+    }
+    button:hover { background-color: #3b5a86; }
+    
+    /* 下載按鈕的獨立樣式 */
+    .btn-download {
+      background-color: #27ae60;
+      margin-top: 20px;
+    }
+    .btn-download:hover { background-color: #219653; }
+    
+    .result-area { margin-top: 25px; padding-top: 20px; border-top: 2px dashed #e1e4e8; display: none; }
+    
+    /* 為了確保截圖時背景是白色的，給要截圖的區塊加上白色背景和 padding */
+    .capture-area {
+      background-color: #ffffff;
+      padding: 15px;
+      border-radius: 8px;
+    }
+    
+    .layout-wrapper { display: flex; flex-direction: column; gap: 30px; margin-bottom: 20px; }
+    .gua-panel { width: 100%; }
+    .wuxing-panel { width: 100%; padding-top: 20px; border-top: 2px dashed #eee; }
+
+    /* 五行方塊樣式 */
+    .wx-grid { 
+      display: grid; 
+      grid-template-columns: repeat(3, 1fr); 
+      gap: 40px 8px; 
+      justify-items: center; 
+      align-items: start; 
+    }
+    .wx-item { display: flex; flex-direction: column; align-items: center; }
+    
+    .wx-box {
+      width: 65px; height: 65px; 
+      border: 2px solid #333; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; position: relative; background: #fff;
+    }
+    
+    .wx-char { font-size: 30px; font-weight: bold; }
+    
+    .wx-count { position: absolute; top: -22px; left: -5px; font-weight: bold; font-size: 16px; color: #333; }
+    .wx-label-top { position: absolute; font-size: 14px; text-align: center; white-space: nowrap; color: #333; font-weight: bold; top: -22px; width: 100%; }
+    
+    .wx-label-bottom { font-size: 14px; color: #333; font-weight: bold; margin-top: 6px; margin-bottom: 4px; text-align: center; }
+    
+    .wx-sources { text-align: center; }
+    .wx-source-line { font-size: 14px; color: #555; margin-bottom: 3px; white-space: nowrap; line-height: 1.3; font-weight: bold; }
+
+    /* 顏色區分 */
+    .wx-color-火 { color: #d32f2f; }
+    .wx-color-土 { color: #8d6e63; }
+    .wx-color-金 { color: #fbc02d; }
+    .wx-color-水 { color: #1976d2; }
+    .wx-color-木 { color: #388e3c; }
+
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; margin-bottom: 15px; }
+    .box { background: #eef2f5; padding: 12px 5px; border-radius: 8px; }
+    .box-title { font-size: 13px; color: #666; margin-bottom: 2px; }
+    .box-symbol { font-size: 52px; line-height: 1.1; margin: 5px 0; color: #34495e; }
+    .box-value { font-size: 17px; font-weight: bold; color: #2c3e50; }
+    
+    /* 新增卦義樣式 */
+    .box-meaning { font-size: 13px; color: #7f8c8d; margin-top: 5px; line-height: 1.4; padding: 0 2px;}
+    
+    .highlight { color: #d35400; font-weight: bold; font-size: 20px; }
+    
+    /* 底部內心卦樣式 */
+    .neixin-area {
+      display: flex;
+      justify-content: space-around;
+      border-top: 2px dashed #eee;
+      padding-top: 20px;
+      margin-top: 10px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #333;
+    }
+    
+    /* 手機長按預覽圖遮罩樣式 */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.85); z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .modal-tip { color: #fff; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-align: center; }
+    .modal-img { max-width: 90%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>開卦試算中階版</h2>
+    <div class="form-row">
+      <!-- 測問事項 -->
+      <div class="input-group full-width">
+        <label>測問事項</label>
+        <input type="text" id="question" placeholder="請輸入問題 (供截圖紀錄使用)">
+      </div>
+      
+      <div class="input-group">
+        <label>月令(地支)</label>
+        <select id="month" required>
+          <!-- 系統會在此自動插入今天的月令 -->
+          <option value="1">1月 (寅)</option>
+          <option value="2">2月 (卯)</option>
+          <option value="3">3月 (辰)</option>
+          <option value="4">4月 (巳)</option>
+          <option value="5">5月 (午)</option>
+          <option value="6">6月 (未)</option>
+          <option value="7">7月 (申)</option>
+          <option value="8">8月 (酉)</option>
+          <option value="9">9月 (戌)</option>
+          <option value="10">10月 (亥)</option>
+          <option value="11">11月 (子)</option>
+          <option value="12">12月 (丑)</option>
+        </select>
+      </div>
+      <div class="input-group"><label>第1把</label><input type="number" id="num1" required></div>
+      <div class="input-group"><label>第2把</label><input type="number" id="num2" required></div>
+      <div class="input-group"><label>第3把</label><input type="number" id="num3" required></div>
+      <div class="input-group">
+        <label>時間數</label>
+        <select id="time" required>
+         <option value="" disabled selected>時辰</option>
+          <option value="1">子 23:00-00:59</option><option value="2">丑 01:00-02:59</option>
+          <option value="3">寅 03:00-04:59</option><option value="4">卯 05:00-06:59</option>
+          <option value="5">辰 07:00-08:59</option><option value="6">巳 09:00-10:59</option>
+          <option value="7">午 11:00-12:59</option><option value="8">未 13:00-14:59</option>
+          <option value="9">申 15:00-16:59</option><option value="10">酉 17:00-18:59</option>
+        </select>
+      </div>
+    </div>
+    
+    <button id="btnSubmit" onclick="runCalculation()">開始排卦</button>
+
+    <!-- 結果區：將下載截圖的目標設定為 captureTarget -->
+    <div id="resultArea" class="result-area">
+      <div id="captureTarget" class="capture-area">
+        
+        <!-- 顯示測問事項區塊 -->
+        <div id="resQuestionArea" style="text-align: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #e1e4e8; display: none;">
+          <span style="font-size: 20px; font-weight: bold; color: #333;">問題：</span>
+          <span id="resQuestion" style="font-size: 20px; font-weight: bold; color: #1976d2;"></span>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 20px; display: flex; justify-content: center; flex-wrap: wrap; gap: 15px;">
+          <div>
+            <span style="font-size: 18px; font-weight: bold; color: #555;">貴人：</span>
+            <span id="resGuiRen" class="highlight"></span>
+          </div>
+          <div>
+            <span style="font-size: 18px; font-weight: bold; color: #555;">卦氣合化：</span>
+            <span id="resGuaQi" class="highlight"></span>
+          </div>
+        </div>
+
+        <div class="layout-wrapper">
+          <!-- 上方：卦象區 -->
+          <div class="gua-panel">
+            <div class="grid-3">
+              <div class="box">
+                <div class="box-title">變卦</div>
+                <div class="box-symbol" id="symBianGua"></div>
+                <div class="box-value" id="resBianGua"></div>
+                <div class="box-meaning" id="meanBianGua"></div>
+              </div>
+              <div class="box">
+                <div class="box-title">互卦</div>
+                <div class="box-symbol" id="symHuGua"></div>
+                <div class="box-value" id="resHuGua"></div>
+                <div class="box-meaning" id="meanHuGua"></div>
+              </div>
+              <div class="box">
+                <div class="box-title">本卦</div>
+                <div class="box-symbol" id="symBenGua"></div>
+                <div class="box-value" id="resBenGua"></div>
+                <div class="box-meaning" id="meanBenGua"></div>
+              </div>
+            </div>
+            <div class="grid-3">
+              <div class="box"><div class="box-title">變</div><div class="box-value" id="resBian"></div></div>
+              <div class="box"><div class="box-title">互用 / 互體</div><div class="box-value"><span id="resHuYong"></span> / <span id="resHuTi"></span></div></div>
+              <div class="box"><div class="box-title">用 / 體</div><div class="box-value"><span id="resYong"></span> / <span id="resTi"></span></div></div>
+            </div>
+          </div>
+
+          <!-- 下方：五行佈局區 -->
+          <div class="wuxing-panel">
+            <div style="text-align: center; color: #666; font-size: 15px; font-weight: bold; margin-bottom: 25px;">【 五行能量與卦名分佈 】</div>
+            <div class="wx-grid" id="wxGridArea"></div>
+          </div>
+        </div>
+        
+        <!-- 最下方：內心卦 -->
+        <div class="neixin-area">
+          <div>內心(體)： <span id="resNeiXinTi" style="color: #d32f2f;"></span></div>
+          <div>內心(用)： <span id="resNeiXinYong"></span></div>
+        </div>
+      </div>
+      <!-- 下載截圖按鈕放在 captureTarget 的外面，這樣它不會出現在圖片中 -->
+      <button id="btnDownload" class="btn-download" onclick="downloadImage()">⬇️ 下載截圖</button>
+    </div>
+  </div>
+
+  <script>
+    // --- 頁面載入時自動取得今天的節氣月令 ---
+    window.onload = function() {
+      try {
+        const today = new Date();
+        const lunar = Lunar.fromDate(today);
+        // 取得精確的節氣月地支 (如: 寅, 卯...)
+        const autoMonthZhi = lunar.getMonthZhiExact(); 
+        
+        // 將地支轉換為系統使用的月份數字
+        const zhiToMonth = { '寅':1, '卯':2, '辰':3, '巳':4, '午':5, '未':6, '申':7, '酉':8, '戌':9, '亥':10, '子':11, '丑':12 };
+        const autoMonthNum = zhiToMonth[autoMonthZhi];
+        
+        // 在選單最上方插入自動計算的選項並預設選中
+        const monthSelect = document.getElementById('month');
+        const autoOption = document.createElement('option');
+        autoOption.value = autoMonthNum;
+        autoOption.selected = true;
+        autoOption.text = `[自動] ${autoMonthNum}月(${autoMonthZhi})`;
+        monthSelect.insertBefore(autoOption, monthSelect.firstChild);
+      } catch(e) {
+        console.log("曆法載入失敗，將使用手動選單", e);
+      }
+    };
+
+    const trigrams = {
+      1:{name:'乾',wx:'金',bits:'111'}, 2:{name:'兌',wx:'金',bits:'110'},
+      3:{name:'離',wx:'火',bits:'101'}, 4:{name:'震',wx:'木',bits:'100'},
+      5:{name:'巽',wx:'木',bits:'011'}, 6:{name:'坎',wx:'水',bits:'010'},
+      7:{name:'艮',wx:'土',bits:'001'}, 8:{name:'坤',wx:'土',bits:'000'}
+    };
+    const bitsMap = {'111':1,'110':2,'101':3,'100':4,'011':5,'010':6,'001':7,'000':8};
+    const hexagramNames = {
+      '乾乾':'乾為天','乾兌':'天澤履','乾離':'天火同人','乾震':'天雷無妄','乾巽':'天風姤','乾坎':'天水訟','乾艮':'天山遯','乾坤':'天地否',
+      '兌乾':'澤天夬','兌兌':'兌為澤','兌離':'澤火革','兌震':'澤雷隨','兌巽':'澤風大過','兌坎':'澤水困','兌艮':'澤山咸','兌坤':'澤地萃',
+      '離乾':'火天大有','離兌':'火澤睽','離離':'離為火','離震':'火雷噬嗑','離巽':'火風鼎','離坎':'火水未濟','離艮':'火山旅','離坤':'火地晉',
+      '震乾':'雷天大壯','震兌':'雷澤歸妹','震離':'雷火豐','震震':'震為雷','震巽':'雷風恆','震坎':'雷水解','震艮':'雷山小過','震坤':'雷地豫',
+      '巽乾':'風天小畜','巽兌':'風澤中孚','巽離':'風火家人','巽震':'風雷益','巽巽':'巽為風','巽坎':'風水渙','巽艮':'風山漸','巽坤':'風地觀',
+      '坎乾':'水天需','坎兌':'水澤節','坎離':'水火既濟','坎震':'水雷屯','坎巽':'水風井','坎坎':'坎為水','坎艮':'水山蹇','坎坤':'水地比',
+      '艮乾':'山天大畜','艮兌':'山澤損','艮離':'山火賁','艮震':'山雷頤','艮巽':'山風蠱','艮坎':'山水蒙','艮艮':'艮為山','艮坤':'山地剝',
+      '坤乾':'地天泰','坤兌':'地澤臨','坤離':'地火明夷','坤震':'地雷復','坤巽':'地風升','坤坎':'地水師','坤艮':'地山謙','坤坤':'坤為地'
+    };
+    const hexagramSymbols = {
+      '乾為天':'䷀','坤為地':'䷁','水雷屯':'䷂','山水蒙':'䷃','水天需':'䷄','天水訟':'䷅','地水師':'䷆','水地比':'䷇',
+      '風天小畜':'䷈','天澤履':'䷉','地天泰':'䷊','天地否':'䷋','天火同人':'䷌','火天大有':'䷍','地山謙':'䷎','雷地豫':'䷏',
+      '澤雷隨':'䷐','山風蠱':'䷑','地澤臨':'䷒','風地觀':'䷓','火雷噬嗑':'䷔','山火賁':'䷕','山地剝':'䷖','地雷復':'䷗',
+      '天雷無妄':'䷘','山天大畜':'䷙','山雷頤':'䷚','澤風大過':'䷛','坎為水':'䷜','離為火':'䷝','澤山咸':'䷞','雷風恆':'䷟',
+      '天山遯':'䷠','雷天大壯':'䷡','火地晉':'䷢','地火明夷':'䷣','風火家人':'䷤','火澤睽':'䷥','水山蹇':'䷦','雷水解':'䷧',
+      '山澤損':'䷨','風雷益':'䷩','澤天夬':'䷪','天風姤':'䷫','澤地萃':'䷬','地風升':'䷭','澤水困':'䷮','水風井':'䷯',
+      '澤火革':'䷰','火風鼎':'䷱','震為雷':'䷲','艮為山':'䷳','風山漸':'䷴','雷澤歸妹':'䷵','雷火豐':'䷶','火山旅':'䷷',
+      '巽為風':'䷸','兌為澤':'䷹','風水渙':'䷺','水澤節':'䷻','風澤中孚':'䷼','雷山小過':'䷽','水火既濟':'䷾','火水未濟':'䷿'
+    };
+
+    // --- 卦義資料庫 ---
+    const hexagramMeanings = {
+      '乾為天': { strong: '霸氣金、要求完美、ㄍㄧㄥ、剛硬', weak: '霸氣金、要求完美、ㄍㄧㄥ、剛硬' },
+      '天澤履': { strong: '做、執行', weak: '如履薄冰，戰戰兢兢' },
+      '天火同人': { strong: '與別人合作一起', weak: '與別人合作一起' },
+      '天雷無妄': { strong: '有驚無險', weak: '有驚無險' },
+      '天風姤': { strong: '來來去去、奔波', weak: '來來去去、奔波' },
+      '天水訟': { strong: '爭吵、不爽', weak: '爭吵、不爽' },
+      '天山遯': { strong: '逃離、退隱', weak: '逃離、退隱' },
+      '天地否': { strong: '上下不相交', weak: '上下不相交' },
+      '澤天夬': { strong: '分裂成一大一小', weak: '分裂成一大一小' },
+      '兌為澤': { strong: '2個嘴巴-抱怨', weak: '2個嘴巴-抱怨' },
+      '澤火革': { strong: '舊的不要，改革換新', weak: '舊的不要，改革換新' },
+      '澤雷隨': { strong: '隨心所欲', weak: '隨波逐流' },
+      '澤風大過': { strong: '壓力大到受不了，瀕臨崩潰', weak: '壓力大到受不了，瀕臨崩潰' },
+      '澤水困': { strong: '困難，一滴水都生不出來', weak: '困難，一滴水都生不出來' },
+      '澤山咸': { strong: '快速通氣', weak: '快速通氣' },
+      '澤地萃': { strong: '有喜事慢慢發生', weak: '有喜事慢慢發生' },
+      '火天大有': { strong: '很多', weak: '很多' },
+      '火澤睽': { strong: '事與願違，力不從心', weak: '事與願違，力不從心' },
+      '離為火': { strong: '情緒火2把很大', weak: '情緒火2把很大' },
+      '火雷噬嗑': { strong: '有異物在口、卡住', weak: '有異物在口、卡住' },
+      '火風鼎': { strong: '三人，三角關係', weak: '三人，三角關係' },
+      '火水未濟': { strong: '未完待續', weak: '未完待續' },
+      '火山旅': { strong: '烈日下旅人，無奈走下去', weak: '烈日下旅人，無奈走下去' },
+      '火地晉': { strong: '晉升', weak: '晉升' },
+      '雷天大壯': { strong: '雷聲大雨點小，虛晃一招', weak: '雷聲大雨點小，虛晃一招' },
+      '雷澤歸妹': { strong: '煩', weak: '煩' },
+      '雷火豐': { strong: '豐富', weak: '豐富' },
+      '震為雷': { strong: '急躁、動、想變化', weak: '急躁、動、想變化' },
+      '雷風恆': { strong: '持之以恆', weak: '持之以恆' },
+      '雷水解': { strong: '解除、破冰解決', weak: '解除、破冰解決' },
+      '雷山小過': { strong: '有一點過頭，要修正', weak: '有一點過頭，要修正' },
+      '雷地豫': { strong: '草木初生，自己猶豫', weak: '草木初生，自己猶豫' },
+      '風天小畜': { strong: '等待滯運過去', weak: '等待滯運過去' },
+      '風澤中孚': { strong: '被照顧的很好', weak: '被照顧的很好' },
+      '風火家人': { strong: '跟家人有關的事', weak: '跟家人有關的事' },
+      '風雷益': { strong: '收益', weak: '收益' },
+      '巽為風': { strong: '進出不定、變化多端', weak: '進出不定、變化多端' },
+      '風水渙': { strong: '交換、變化', weak: '交換、變化' },
+      '風山漸': { strong: '前方有人事物在等你，一定等到你', weak: '前方有人事物在等你，一定等到你' },
+      '風地觀': { strong: '狂風在上，只能無奈觀察', weak: '狂風在上，只能無奈觀察' },
+      '水天需': { strong: '需要等水來、等待', weak: '需要等水來、等待' },
+      '水澤節': { strong: '調節一下就好', weak: '調節一下就好' },
+      '水火既濟': { strong: '100分（水滾了）、現況是最好', weak: '100分（水滾了）、現況是最好' },
+      '水雷屯': { strong: '塞住', weak: '塞住' },
+      '水風井': { strong: '長久調節，留下舊的繼續用', weak: '長久調節，留下舊的繼續用' },
+      '坎為水': { strong: '憂鬱、擔心', weak: '憂鬱、擔心' },
+      '水山蹇': { strong: '進退兩難', weak: '進退兩難' },
+      '水地比': { strong: '比翼雙飛-好', weak: '比翼雙飛-好' },
+      '山天大畜': { strong: '土中藏金.很久有儲蓄長時間的事-好', weak: '土中藏金.很久有儲蓄長時間的事-好' },
+      '山澤損': { strong: '損失', weak: '損失' },
+      '山火賁': { strong: '外美內虛、做表面功夫', weak: '外美內虛、做表面功夫' },
+      '山雷頤': { strong: '開心', weak: '開心' },
+      '山風蠱': { strong: '好兄弟(卡陰)、感情→因果卡陰', weak: '好兄弟(卡陰)、感情→因果卡陰' },
+      '山水蒙': { strong: '好兄弟(卡陰)', weak: '好兄弟(卡陰)' },
+      '艮為山': { strong: '兩座山不動，所求難以實現', weak: '兩座山不動，所求難以實現' },
+      '山地剝': { strong: '被剝削到剩下一根骨頭', weak: '被剝削到剩下一根骨頭' },
+      '地天泰': { strong: '安泰', weak: '安泰' },
+      '地澤臨': { strong: '面臨抉擇', weak: '面臨抉擇' },
+      '地火明夷': { strong: '太陽沒入地底下，黑暗來臨', weak: '太陽沒入地底下，黑暗來臨' },
+      '地雷復': { strong: '同一件事一直反覆發生', weak: '同一件事一直反覆發生' },
+      '地風升': { strong: '上升', weak: '上升' },
+      '地水師': { strong: '勞師動眾，一群人為此事忙', weak: '勞師動眾，一群人為此事忙' },
+      '地山謙': { strong: '謙虛-擺低姿態換取劣勢下存活機會', weak: '謙虛-擺低姿態換取劣勢下存活機會' },
+      '坤為地': { strong: '包容，吞忍', weak: '包容，吞忍' }
+    };
+
+    const shengMap = {'金':'水', '水':'木', '木':'火', '火':'土', '土':'金'};
+    const keMap = {'金':'木', '木':'土', '土':'水', '水':'火', '火':'金'};
+    const wxColors = { '火': '#d32f2f', '土': '#8d6e63', '金': '#fbc02d', '水': '#1976d2', '木': '#388e3c' };
+    
+    function findWxRelation(tiWx) {
+      let shengMe = Object.keys(shengMap).find(k => shengMap[k] === tiWx);
+      let meSheng = shengMap[tiWx];
+      let keMe = Object.keys(keMap).find(k => keMap[k] === tiWx);
+      let meKe = keMap[tiWx];
+      return { tiWx, shengMe, meSheng, keMe, meKe };
+    }
+
+    function runCalculation() {
+      // 取得輸入的問題
+      const questionText = document.getElementById('question').value.trim();
+      const month = parseInt(document.getElementById('month').value);
+      const num1 = parseInt(document.getElementById('num1').value);
+      const num2 = parseInt(document.getElementById('num2').value);
+      const num3 = parseInt(document.getElementById('num3').value);
+      const time = parseInt(document.getElementById('time').value);
+      if(!month || !num1 || !num2 || !num3 || !time) { alert("請輸入完整的資料"); return; }
+
+      // 地支六合：判斷卦氣合化
+      let guaQi = "";
+      if (month === 1 || month === 10) guaQi = "木";
+      else if (month === 2 || month === 9 || month === 5 || month === 6) guaQi = "火";
+      else if (month === 11 || month === 12) guaQi = "土";
+      else if (month === 3 || month === 8) guaQi = "金";
+      else if (month === 4 || month === 7) guaQi = "水";
+
+      let upperIdx = num1 % 8 || 8;
+      let lowerIdx = (num2 + num3) % 8 || 8;
+      let movingYao = (num1 + num2 + num3 + time) % 6 || 6;
+
+      const upperGua = trigrams[upperIdx];
+      const lowerGua = trigrams[lowerIdx];
+      
+      let yaosArr = (lowerGua.bits + upperGua.bits).split('');
+      let bianYaosArr = [...yaosArr];
+      bianYaosArr[movingYao-1] = bianYaosArr[movingYao-1] === '1' ? '0' : '1';
+      
+      const bianLowerGua = trigrams[bitsMap[bianYaosArr.slice(0,3).join('')]];
+      const bianUpperGua = trigrams[bitsMap[bianYaosArr.slice(3,6).join('')]];
+
+      let sourceYaosArr = (yaosArr.join('') === '111111' || yaosArr.join('') === '000000') ? bianYaosArr : yaosArr;
+      const huLowerGua = trigrams[bitsMap[sourceYaosArr.slice(1,4).join('')]];
+      const huUpperGua = trigrams[bitsMap[sourceYaosArr.slice(2,5).join('')]];
+
+      let tiGua = movingYao <= 3 ? upperGua : lowerGua;
+      let yongGua = movingYao <= 3 ? lowerGua : upperGua;
+      let huTiGua = movingYao <= 3 ? huUpperGua : huLowerGua;
+      let huYongGua = movingYao <= 3 ? huLowerGua : huUpperGua;
+      let bianTransformed = movingYao <= 3 ? bianLowerGua : bianUpperGua;
+
+      const benGuaName = hexagramNames[upperGua.name + lowerGua.name];
+      const huGuaName = hexagramNames[huUpperGua.name + huLowerGua.name];
+      const bianGuaName = hexagramNames[bianUpperGua.name + bianLowerGua.name];
+
+      // --- 內心卦(體) - 錯卦：本卦所有爻互換(1變0, 0變1) ---
+      let cuoYaosArr = yaosArr.map(b => b === '1' ? '0' : '1');
+      const cuoLowerGua = trigrams[bitsMap[cuoYaosArr.slice(0,3).join('')]];
+      const cuoUpperGua = trigrams[bitsMap[cuoYaosArr.slice(3,6).join('')]];
+      const neiXinTiName = hexagramNames[cuoUpperGua.name + cuoLowerGua.name];
+
+      // --- 內心卦(用) - 綜卦：本卦翻轉180度 (陣列順序反轉) ---
+      let zongYaosArr = [...yaosArr].reverse();
+      const zongLowerGua = trigrams[bitsMap[zongYaosArr.slice(0,3).join('')]];
+      const zongUpperGua = trigrams[bitsMap[zongYaosArr.slice(3,6).join('')]];
+      const neiXinYongName = hexagramNames[zongUpperGua.name + zongLowerGua.name];
+
+      const guaSourcesAll = [
+        { id: '體', tri: tiGua, hex: benGuaName, show: false }, 
+        { id: '1', tri: yongGua, hex: benGuaName, show: true }, 
+        { id: '2', tri: huTiGua, hex: huGuaName, show: true },  
+        { id: '3', tri: huYongGua, hex: huGuaName, show: true },
+        { id: '4', tri: bianTransformed, hex: bianGuaName, show: true } 
+      ];
+
+      const wxCounts = { '金': 0, '木': 0, '水': 0, '火': 0, '土': 0 };
+      guaSourcesAll.forEach(src => wxCounts[src.tri.wx]++);
+
+      const strengthCount = wxCounts[tiGua.wx] + wxCounts[findWxRelation(tiGua.wx).shengMe];
+      let bodyStatus = strengthCount >= 3 ? "身強" : "身弱";
+      
+      let guiRen = "";
+      if (strengthCount >= 3) {
+        let cycle = ['木', '火', '土', '金', '水'];
+        let idx = cycle.indexOf(tiGua.wx);
+        for (let i = 1; i <= 4; i++) {
+          if (wxCounts[cycle[(idx + i) % 5]] === 0) { guiRen = cycle[(idx + i) % 5]; break; }
+        }
+      } else {
+        guiRen = findWxRelation(tiGua.wx).shengMe;
+      }
+
+      document.getElementById('resultArea').style.display = 'block';
+      
+      // 更新問題區塊
+      if (questionText) {
+        document.getElementById('resQuestion').innerText = questionText;
+        document.getElementById('resQuestionArea').style.display = 'block';
+      } else {
+        document.getElementById('resQuestionArea').style.display = 'none';
+      }
+      
+      document.getElementById('resGuiRen').innerText = `${guiRen} (${bodyStatus})`;
+      document.getElementById('resGuaQi').innerText = guaQi;
+      document.getElementById('resGuaQi').style.color = wxColors[guaQi] || '#d35400';
+
+      document.getElementById('resBenGua').innerText = benGuaName;
+      document.getElementById('resHuGua').innerText = huGuaName;
+      document.getElementById('resBianGua').innerText = bianGuaName;
+      document.getElementById('symBenGua').innerText = hexagramSymbols[benGuaName];
+      document.getElementById('symHuGua').innerText = hexagramSymbols[huGuaName];
+      document.getElementById('symBianGua').innerText = hexagramSymbols[bianGuaName];
+      
+      // 動態更新卦義
+      let statusKey = (bodyStatus === "身強") ? "strong" : "weak";
+      document.getElementById('meanBenGua').innerText = hexagramMeanings[benGuaName] ? hexagramMeanings[benGuaName][statusKey] : '';
+      document.getElementById('meanHuGua').innerText = hexagramMeanings[huGuaName] ? hexagramMeanings[huGuaName][statusKey] : '';
+      document.getElementById('meanBianGua').innerText = hexagramMeanings[bianGuaName] ? hexagramMeanings[bianGuaName][statusKey] : '';
+
+      document.getElementById('resTi').innerText = tiGua.name + tiGua.wx;
+      document.getElementById('resYong').innerText = yongGua.name + yongGua.wx;
+      document.getElementById('resHuTi').innerText = huTiGua.name + huTiGua.wx;
+      document.getElementById('resHuYong').innerText = huYongGua.name + huYongGua.wx;
+      document.getElementById('resBian').innerText = bianTransformed.name + bianTransformed.wx;
+
+      document.getElementById('resNeiXinTi').innerText = neiXinTiName;
+      document.getElementById('resNeiXinYong').innerText = neiXinYongName;
+
+      const rel = findWxRelation(tiGua.wx);
+      const circledNum = { '1': '①', '2': '②', '3': '③', '4': '④' };
+      
+      const buildBox = (wx, labelTop, labelBottom) => {
+        let sourcesHTML = '';
+        const matches = guaSourcesAll.filter(s => s.tri.wx === wx && s.show);
+        
+        matches.forEach((m) => {
+           sourcesHTML += `<div class="wx-source-line">${circledNum[m.id]} ${m.tri.name}：${m.hex}</div>`;
+        });
+
+        return `
+          <div class="wx-item">
+            <div class="wx-box wx-color-${wx}">
+              <div class="wx-count">${wxCounts[wx] || ''}</div>
+              <div class="wx-label-top">${labelTop}</div>
+              <span class="wx-char">${wx}</span>
+            </div>
+            <div class="wx-label-bottom">${labelBottom}</div>
+            <div class="wx-sources">
+              ${sourcesHTML}
+            </div>
+          </div>
+        `;
+      };
+
+      document.getElementById('wxGridArea').innerHTML = `
+        ${buildBox(rel.shengMe, '生我', '家庭格')}
+        <div></div>
+        ${buildBox(rel.tiWx, '體', bodyStatus)}
+        ${buildBox(rel.keMe, '剋我', '官鬼格')}
+        ${buildBox(rel.meKe, '我剋', '妻財格')}
+        ${buildBox(rel.meSheng, '我生', '付出格')}
+      `;
+    }
+
+    // --- 【升級版】手機/電腦通用的圖片下載與分享功能 ---
+    function downloadImage() {
+      const captureTarget = document.getElementById('captureTarget');
+      const btn = document.getElementById('btnDownload');
+      
+      // 按鈕 UX 提示
+      const originalText = btn.innerText;
+      btn.innerText = "⏳ 圖片產生中...";
+      btn.disabled = true;
+
+      // 使用 html2canvas 產生圖片
+      html2canvas(captureTarget, {
+        scale: window.devicePixelRatio > 1 ? 2 : 1, // 根據設備像素動態調整解析度，避免過大崩潰
+        backgroundColor: '#ffffff',
+        useCORS: true
+      }).then(canvas => {
+        // 恢復按鈕狀態
+        btn.innerText = originalText;
+        btn.disabled = false;
+        
+        const questionText = document.getElementById('question').value.trim();
+        const fileName = questionText ? `易經卦象_${questionText}.png` : '易經卦象.png';
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+        // 將 Canvas 轉為 Blob 格式 (對於手機分享支援度更好)
+        canvas.toBlob(function(blob) {
+          // 【方案A】嘗試使用手機原生分享 API (支援 iOS 15+ / Android)
+          if (navigator.share && isMobile) {
+            const file = new File([blob], fileName, { type: 'image/png' });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              navigator.share({
+                files: [file],
+                title: '易經開卦結果',
+                text: questionText ? `測問事項：${questionText}` : '易經開卦結果分享'
+              }).catch((error) => {
+                // 如果使用者取消分享，或是發生錯誤，自動降級使用方案B
+                console.log('分享取消或失敗，啟用備用方案', error);
+                showFallbackModal(canvas.toDataURL('image/png'));
+              });
+              return; // 成功呼叫分享 API 後結束
+            }
+          }
+
+          // 【方案B】傳統點擊下載 (適用於電腦端)
+          if (!isMobile) {
+            const imgData = canvas.toDataURL('image/png');
+            const a = document.createElement('a');
+            a.href = imgData;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          } else {
+            // 【方案C】如果是手機但不支援分享 API (如 LINE 瀏覽器)，直接彈出視窗讓使用者長按儲存
+            showFallbackModal(canvas.toDataURL('image/png'));
+          }
+
+        }, 'image/png');
+
+      }).catch(err => {
+        btn.innerText = originalText;
+        btn.disabled = false;
+        console.error("圖片產生失敗", err);
+        alert("產生截圖失敗，請稍後再試！\n" + err.message);
+      });
+    }
+
+    // --- 終極備用方案：顯示全螢幕預覽圖供手機使用者長按儲存 ---
+    function showFallbackModal(dataUrl) {
+      // 建立全螢幕遮罩
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      
+      // 提示文字
+      const tip = document.createElement('div');
+      tip.className = 'modal-tip';
+      tip.innerHTML = "請「長按下方圖片」選擇儲存或分享<br><span style='font-size:14px; font-weight:normal; color:#ccc;'>(點擊背景任意處可關閉)</span>";
+      
+      // 圖片元件
+      const img = document.createElement('img');
+      img.className = 'modal-img';
+      img.src = dataUrl;
+      
+      // 點擊背景關閉
+      overlay.onclick = function() {
+        document.body.removeChild(overlay);
+      };
+      
+      // 點擊圖片不關閉
+      img.onclick = function(e) {
+        e.stopPropagation();
+      };
+      
+      overlay.appendChild(tip);
+      overlay.appendChild(img);
+      document.body.appendChild(overlay);
+    }
+  </script>
+</body>
+</html>
