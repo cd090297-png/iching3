@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>易經開卦</title>
+  <title>開卦小廢物</title>
   
   <!-- 引入開源的曆法套件：自動精算當日節氣與地支月令 -->
   <script src="https://cdn.jsdelivr.net/npm/lunar-javascript/lunar.js"></script>
@@ -114,9 +114,9 @@
     .gua-grid .box-value { font-size: 18px; font-weight: 900; color: #111; } /* 最高級別加粗 */
     .gua-grid .box-meaning { font-size: 15px; color: #222; margin-top: 6px; line-height: 1.4; padding: 0 2px; font-weight: bold; }
     .gua-grid .box-item { margin-bottom: 4px; font-size: 16px; font-weight: 900; color: #111; } /* 最高級別加粗 */
-    .gua-grid .box-rel { margin-bottom: 4px; font-size: 14px; color: #555; font-weight: bold; }
-    .gua-grid .box-sym { font-size: 16px; font-weight: bold; margin-bottom: 4px; color: #333;}
     .gua-grid .box-cs { margin-top: auto; padding-top: 8px; font-size: 17px; font-weight: 900; color: #d35400; }
+    
+    /* 這裡已將字體改回正常粗細 (normal) */
     .gua-grid .box-num { font-size: 16px; font-weight: normal; color: #111; margin-top: 4px; }
 
     .highlight { color: #d35400; font-weight: bold; font-size: 20px; }
@@ -132,7 +132,7 @@
 </head>
 <body>
   <div class="container">
-    <h2>開卦超方便-小廢物版</h2>
+    <h2>開卦小廢物-超方便版</h2>
     <div class="form-row">
       <!-- 測問事項 -->
       <div class="input-group full-width">
@@ -197,7 +197,7 @@
 
         <div class="layout-wrapper">
           <div class="gua-panel">
-            <!-- 統一網格區：JavaScript 會將 卦象 與 體用 區塊插入這裡確保完美對齊 -->
+            <!-- 統一網格區 -->
             <div class="gua-grid" id="unifiedGuaArea"></div>
           </div>
 
@@ -208,7 +208,7 @@
         </div>
         
         <div class="neixin-area">
-          <div>內心(體)： <span id="resNeiXinTi" style="color: #d32f2f;"></span></div>
+          <div>內心(體)： <span id="resNeiXinTi" ></span></div>
           <div>內心(用)： <span id="resNeiXinYong"></span></div>
         </div>
       </div>
@@ -332,7 +332,7 @@
     // --- 十二長生對照表 ---
     const changshengTable = {
       '乾': ['絕', '胎', '養', '長生', '沐浴', '冠帶', '臨官', '帝旺', '衰', '病', '死', '墓'],
-      '兌': ['胎', '絕', '沐浴', '病', '帝旺', '臨官', '死', '長生', '墓', '死', '長生', '養'], // 依照您給的邏輯，這裡做個簡單修正示範，確保與先前提供一致
+      '兌': ['胎', '絕', '沐浴', '病', '帝旺', '臨官', '死', '長生', '墓', '死', '長生', '養'],
       '離_上': ['長生', '沐浴', '冠帶', '臨官', '帝旺', '衰', '病', '死', '墓', '絕', '胎', '養'],
       '離_下': ['死', '病', '衰', '帝旺', '臨官', '冠帶', '沐浴', '長生', '養', '胎', '絕', '墓'],
       '震': ['臨官', '帝旺', '衰', '病', '死', '墓', '絕', '胎', '養', '長生', '沐浴', '冠帶'],
@@ -368,7 +368,7 @@
       if (isTiGua) return { text: "自己", sym: "○" };
       if (tiWx === targetWx) return { text: "同我", sym: "○" };
       if (shengMap[targetWx] === tiWx) return { text: "生我", sym: "○" };
-      if (shengMap[tiWx] === targetWx) return { text: "我生", sym: "△" }; 
+      if (shengMap[tiWx] === targetWx) return { text: "我洩", sym: "△" }; 
       if (keMap[tiWx] === targetWx) return { text: "我剋", sym: "△" };
       if (keMap[targetWx] === tiWx) return { text: "剋我", sym: "×" };
       return { text: "未知", sym: "" };
@@ -532,19 +532,18 @@
         let csKey = getCsKey(item.gua.name, item.pos);
         let csValue = changshengTable[csKey] ? changshengTable[csKey][monthIdx] : "未設";
         
-// 判斷是否要顯示該卦對應的數字
-        let numVal = "&nbsp;"; // 預設空格，確保排版對齊
+        // 判斷是否要顯示該卦對應的數字 (新增包含"同我")
+        let numVal = "&nbsp;"; 
         if (item.isTi || rel.text === "生我" || rel.text === "我剋" || rel.text === "同我") {
             numVal = guaNumbers[item.gua.name] || "&nbsp;";
         }
         
+        // 【版面瘦身】已移除原本的 box-rel 與 box-sym
         unifiedGridHTML += `
           <div class="box ${item.colClass}">
             <div class="box-title">${item.title}</div>
             <div class="box-item">${item.gua.name}</div>
             <div class="box-item">${item.gua.wx}</div>
-            <div class="box-rel">${rel.text}</div>
-            <div class="box-sym">${rel.sym}</div>
             <div class="box-cs">${csValue}</div>
             <div class="box-num">${numVal}</div>
           </div>
@@ -583,12 +582,12 @@
       };
 
       document.getElementById('wxGridArea').innerHTML = `
-        ${buildBox(relObj.shengMe, '生我', '家庭格')}
+        ${buildBox(relObj.shengMe, '生我○', '家庭格')}
         <div></div>
-        ${buildBox(relObj.tiWx, '體', bodyStatus)}
-        ${buildBox(relObj.keMe, '剋我', '官鬼格')}
-        ${buildBox(relObj.meKe, '我剋', '妻財格')}
-        ${buildBox(relObj.meSheng, '我生', '付出格')}
+        ${buildBox(relObj.tiWx, '體○', bodyStatus)}
+        ${buildBox(relObj.keMe, '剋我╳', '官鬼格')}
+        ${buildBox(relObj.meKe, '我剋▲', '妻財格')}
+        ${buildBox(relObj.meSheng, '我洩╳', '付出格')}
       `;
     }
 
